@@ -13,6 +13,8 @@ const char* mqtt_username = "ICERUS";
 const char* mqtt_password = "Projectyear3";
 const int mqtt_port =8883;
 
+const int watering = 27;
+
 BH1750 lightMeter(0x23);
  
 
@@ -26,15 +28,17 @@ char msg[MSG_BUFFER_SIZE];
 
 
 int light_sensor = 0;
-float sensor2 = 0;
+int rh_sensor = 0;
+int temp_sensor = 0;
 int command1 =0;
 
-const char* light_sensor_topic= "light_sensor";
-const char*  sensor2_topic="sensor2";
-//const char*  sensor2_topic="sensor3";
+const char* light_sensor_topic= "sensor/light";
+const char*  rh_sensor_topic="sensor/rh";
+const char* temp_sensor_topic= "sensor/temp";
+//const char*  rh_sensor_topic="sensor3";
 
-const char* command1_topic="command1";
-const char* command2_topic="command2";
+const char* command1_topic="sensor/watering";
+const char* command2_topic="lighting";
 
 
 
@@ -84,8 +88,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
   //--- check the incomming message (led)
     if( strcmp(topic,command1_topic) == 0){
-     if (incommingMessage.equals("on")) digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on 
-     else digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off 
+      Serial.println("Watering System ");
+     if (incommingMessage.equals("on")) {
+       digitalWrite(watering, HIGH);
+       Serial.println("ON");  // Turn the LED on 
+     }
+     else {
+       digitalWrite(watering, LOW);
+       Serial.println("OFF");  // Turn the LED off 
+     }
   }
 
    //  check for other commands (pump)
@@ -139,6 +150,7 @@ void reconnect() {
 //================================================
 void setup() {
   Serial.begin(9600);
+  pinMode(watering, OUTPUT);
   Wire.begin();
   if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
     Serial.println(F("BH1750 Advanced begin"));
@@ -183,9 +195,11 @@ void loop() {
     light_sensor= lightMeter.readLightLevel();   
     }
 
-    sensor2= 20+random(80);    // replace the random value  with your sensor value
+    rh_sensor= 20+random(80); 
+    temp_sensor= 55;   // replace the random value  with your sensor value
     publishMessage(light_sensor_topic,String(light_sensor),true);    
-    publishMessage(sensor2_topic,String(sensor2),true);
+    publishMessage(rh_sensor_topic,String(rh_sensor),true);
+    publishMessage(temp_sensor_topic,String(temp_sensor),true);
     
   }
 }
