@@ -48,6 +48,7 @@ int rh_sensor = 0;
 int rh_value = 0;
 
 int defaultCount = 0;
+int led_status = 0;
 
 const char* light_sensor_topic= "sensor/light";
 const char*  rh_sensor_topic="sensor/rh";
@@ -121,7 +122,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
        Serial.println("ON");  // Turn the pump on 
        //delay(2000);
        //digitalWrite(watering, LOW);
-       //Serial.println("OFF"); 
+       //Serial.println("OFF");   
      }
      else {
        digitalWrite(watering, LOW);
@@ -132,24 +133,80 @@ void callback(char* topic, byte* payload, unsigned int length) {
    //  check for other commands (led)
    else  if( strcmp(topic,command2_topic) == 0){
      if (incommingMessage.equals("high")) {
+       if (led_status == 0){
+        digitalWrite(light1, LOW);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, LOW);
+        delay(1500);
+
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, LOW);
+        digitalWrite(light3, HIGH);
+        delay(1500);
+
         digitalWrite(light1, HIGH);
         digitalWrite(light2, HIGH);
         digitalWrite(light3, HIGH);
         Serial.println("HIGH LED");
+        led_status = 3;
+       }
+       else if (led_status == 1) {
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, LOW);
+        digitalWrite(light3, HIGH);
+        delay(1500);
+
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, HIGH);
+        Serial.println("HIGH LED");
+        led_status = 3;
+
+       }
+       else if (led_status == 2) {
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, HIGH);
+        Serial.println("HIGH LED");
+        led_status = 3;
+       }
+       else {
+
+       }
+        
 
        } 
       else if (incommingMessage.equals("med")){
-         digitalWrite(light1, HIGH);
+        if (led_status == 0) {
+        digitalWrite(light1, LOW);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, LOW);
+        delay(1500);
+
+        digitalWrite(light1, HIGH);
         digitalWrite(light2, LOW);
         digitalWrite(light3, HIGH);
         Serial.println("MED LED");
+        led_status = 2;
+        }
+        else if (led_status == 1 || led_status == 3) {
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, LOW);
+        digitalWrite(light3, HIGH);
+        Serial.println("MED LED");
+        led_status = 2;
+        }
+        else {
+
+        }
 
       }
       else if (incommingMessage.equals("low")) {
-         digitalWrite(light1, LOW);
+        digitalWrite(light1, LOW);
         digitalWrite(light2, HIGH);
         digitalWrite(light3, LOW);
         Serial.println("LOW LED");
+        led_status = 1;
 
       }
       else {
@@ -157,6 +214,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         digitalWrite(light2, LOW);
         digitalWrite(light3, LOW);
         Serial.println("OFF");
+        led_status = 0;
       }
   }
   else {
@@ -258,7 +316,7 @@ void loop() {
 
   //----  publish sensor values every 10 sec
   unsigned long now = millis();
-  if (now - lastMsg > 10000) {
+  if (now - lastMsg > 60000) {
     lastMsg = now;
     
     if (lightMeter.measurementReady()) {
