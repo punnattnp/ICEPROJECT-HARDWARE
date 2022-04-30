@@ -2,10 +2,18 @@
 #include <BH1750.h>
 #include <Wire.h>
 #include <WiFiClientSecure.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#define ONE_WIRE_BUS 18 
+#define LED 2
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature tempsensors(&oneWire);
+
+ 
 
 //---- WiFi settings
-const char* ssid = "Phee";
-const char* password = "paengpaeng";
+const char* ssid = "punnattnp";
+const char* password = "ppunnotok34110";
 
 //---- MQTT Broker settings
 const char* mqtt_server = "66d6b91771ff4fc7bb664c04cc3e7fbb.s2.eu.hivemq.cloud";
@@ -14,6 +22,14 @@ const char* mqtt_password = "Projectyear3";
 const int mqtt_port =8883;
 
 const int watering = 27;
+const int light1 = 13;
+const int light2 = 12;
+const int light3 = 14;
+
+const int AirValue = 3371;   //replace this value with Value_1
+const int WaterValue = 1705;  //replace this value with Value_2
+
+const int SensorPin = 35;
 
 BH1750 lightMeter(0x23);
  
@@ -29,8 +45,9 @@ char msg[MSG_BUFFER_SIZE];
 
 int light_sensor = 0;
 int rh_sensor = 0;
-int temp_sensor = 0;
-int command1 =0;
+int rh_value = 0;
+
+int defaultCount = 0;
 
 const char* light_sensor_topic= "sensor/light";
 const char*  rh_sensor_topic="sensor/rh";
@@ -38,7 +55,7 @@ const char* temp_sensor_topic= "sensor/temp";
 //const char*  rh_sensor_topic="sensor3";
 
 const char* command1_topic="sensor/watering";
-const char* command2_topic="lighting";
+const char* command2_topic="sensor/led";
 
 
 
@@ -85,23 +102,65 @@ void callback(char* topic, byte* payload, unsigned int length) {
   for (int i = 0; i < length; i++) incommingMessage+=(char)payload[i];
   
   Serial.println("Message arrived ["+String(topic)+"]"+incommingMessage);
+
+  if (defaultCount == 0) {
+    digitalWrite(watering, LOW);
+    digitalWrite(light1, LOW);
+    digitalWrite(light2, LOW);
+    digitalWrite(light3, LOW);
+    incommingMessage = "";
+    defaultCount = 1;
+    return;
+  }
   
-  //--- check the incomming message (led)
+  //--- check the incomming message (waterpump)
     if( strcmp(topic,command1_topic) == 0){
       Serial.println("Watering System ");
      if (incommingMessage.equals("on")) {
        digitalWrite(watering, HIGH);
-       Serial.println("ON");  // Turn the LED on 
+       Serial.println("ON");  // Turn the pump on 
+       //delay(2000);
+       //digitalWrite(watering, LOW);
+       //Serial.println("OFF"); 
      }
      else {
        digitalWrite(watering, LOW);
-       Serial.println("OFF");  // Turn the LED off 
+       Serial.println("OFF");  // Turn the pump off 
      }
   }
 
-   //  check for other commands (pump)
+   //  check for other commands (led)
    else  if( strcmp(topic,command2_topic) == 0){
-     if (incommingMessage.equals("on")) {  } // Turn the pump on 
+     if (incommingMessage.equals("high")) {
+        digitalWrite(light1, HIGH);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, HIGH);
+        Serial.println("HIGH LED");
+
+       } 
+      else if (incommingMessage.equals("med")){
+         digitalWrite(light1, HIGH);
+        digitalWrite(light2, LOW);
+        digitalWrite(light3, HIGH);
+        Serial.println("MED LED");
+
+      }
+      else if (incommingMessage.equals("low")) {
+         digitalWrite(light1, LOW);
+        digitalWrite(light2, HIGH);
+        digitalWrite(light3, LOW);
+        Serial.println("LOW LED");
+
+      }
+      else {
+        digitalWrite(light1, LOW);
+        digitalWrite(light2, LOW);
+        digitalWrite(light3, LOW);
+        Serial.println("OFF");
+      }
+  }
+  else {
+
   }
   
 }
@@ -134,9 +193,9 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
-
+      digitalWrite(LED,HIGH);
       client.subscribe(command1_topic);   // subscribe the topics here
-      //client.subscribe(command2_topic);   // subscribe the topics here
+      client.subscribe(command2_topic);   // subscribe the topics here
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -151,7 +210,19 @@ void reconnect() {
 void setup() {
   Serial.begin(9600);
   pinMode(watering, OUTPUT);
+  pinMode(light1, OUTPUT);
+  pinMode(light2, OUTPUT);
+  pinMode(light3, OUTPUT);
+  pinMode(LED,OUTPUT);
+
+  digitalWrite(watering, LOW);
+  digitalWrite(light1, LOW);
+  digitalWrite(light2, LOW);
+  digitalWrite(light3, LOW);
+
   Wire.begin();
+  tempsensors.begin();
+  lightMeter.begin();
   if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
     Serial.println(F("BH1750 Advanced begin"));
   } else {
@@ -182,11 +253,10 @@ void publishMessage(const char* topic, String payload , boolean retained){
 //================================================ loop
 //================================================
 void loop() {
-
   if (!client.connected()) reconnect();
   client.loop();
 
-  //---- example: how to publish sensor values every 5 sec
+  //----  publish sensor values every 10 sec
   unsigned long now = millis();
   if (now - lastMsg > 10000) {
     lastMsg = now;
@@ -194,12 +264,17 @@ void loop() {
     if (lightMeter.measurementReady()) {
     light_sensor= lightMeter.readLightLevel();   
     }
+    rh_sensor = analogRead(SensorPin);
+    Serial.println(rh_sensor);
+    rh_value = map(rh_sensor, AirValue, WaterValue, 0, 100);
+      Serial.println(rh_value);
 
-    rh_sensor= 20+random(80); 
-    temp_sensor= 55;   // replace the random value  with your sensor value
+    tempsensors.requestTemperatures();
+    Serial.println(tempsensors.getTempCByIndex(0));
+
     publishMessage(light_sensor_topic,String(light_sensor),true);    
-    publishMessage(rh_sensor_topic,String(rh_sensor),true);
-    publishMessage(temp_sensor_topic,String(temp_sensor),true);
+    publishMessage(rh_sensor_topic,String(rh_value)+"%",true);
+    publishMessage(temp_sensor_topic,String(tempsensors.getTempCByIndex(0)),true);
     
   }
 }
