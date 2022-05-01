@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include "SafeString.h"
 #define ONE_WIRE_BUS 18 
 #define LED 2
 OneWire oneWire(ONE_WIRE_BUS);
@@ -12,14 +13,15 @@ DallasTemperature tempsensors(&oneWire);
  
 
 //---- WiFi settings
-const char* ssid = "punnattnp";
-const char* password = "ppunnotok34110";
+const char* ssid = "Phee";
+const char* password = "paengpaeng";
 
 //---- MQTT Broker settings
 const char* mqtt_server = "66d6b91771ff4fc7bb664c04cc3e7fbb.s2.eu.hivemq.cloud";
 const char* mqtt_username = "ICERUS";
 const char* mqtt_password = "Projectyear3";
 const int mqtt_port =8883;
+const char* boxId = "124";
 
 const int watering = 27;
 const int light1 = 13;
@@ -46,6 +48,7 @@ char msg[MSG_BUFFER_SIZE];
 int light_sensor = 0;
 int rh_sensor = 0;
 int rh_value = 0;
+float temp_value = 0;
 
 int defaultCount = 0;
 int led_status = 0;
@@ -53,7 +56,7 @@ int led_status = 0;
 const char* light_sensor_topic= "sensor/light";
 const char*  rh_sensor_topic="sensor/rh";
 const char* temp_sensor_topic= "sensor/temp";
-//const char*  rh_sensor_topic="sensor3";
+
 
 const char* command1_topic="sensor/watering";
 const char* command2_topic="sensor/led";
@@ -99,10 +102,34 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 
 // This void is called every time we have a message from the broker
 void callback(char* topic, byte* payload, unsigned int length) {
-  String incommingMessage = "";
+  //String incommingMessage = "";
+  createSafeString(incommingMessage, 50);
   for (int i = 0; i < length; i++) incommingMessage+=(char)payload[i];
+
+  createSafeString(recievedId, 20);
+  createSafeString(command,20);
+
+  size_t nextIdx = 0;
+  nextIdx = incommingMessage.stoken(recievedId, nextIdx, ",");
+  nextIdx++; //step over delimiter
+  nextIdx = incommingMessage.stoken(command, nextIdx, ",");
+  nextIdx++; //step over delimiter
+  recievedId.trim();
+  command.trim();
   
-  Serial.println("Message arrived ["+String(topic)+"]"+incommingMessage);
+  Serial.print("\nMessage arrived ["+String(topic)+"]");
+  Serial.print(incommingMessage);
+  Serial.print("\n");
+  Serial.print(recievedId);
+  Serial.print("\n");
+  Serial.print(command);
+  Serial.print("\n");
+
+  if(!recievedId.equals(boxId)){
+    Serial.println("BoxId Mismatch");
+    return;
+
+  }
 
   if (defaultCount == 0) {
     digitalWrite(watering, LOW);
@@ -117,7 +144,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   //--- check the incomming message (waterpump)
     if( strcmp(topic,command1_topic) == 0){
       Serial.println("Watering System ");
-     if (incommingMessage.equals("on")) {
+     if (command.equals("on")) {
        digitalWrite(watering, HIGH);
        Serial.println("ON");  // Turn the pump on 
        //delay(2000);
@@ -132,7 +159,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
    //  check for other commands (led)
    else  if( strcmp(topic,command2_topic) == 0){
-     if (incommingMessage.equals("high")) {
+     if (command.equals("high")) {
        if (led_status == 0){
         digitalWrite(light1, LOW);
         digitalWrite(light2, HIGH);
@@ -176,7 +203,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         
 
        } 
-      else if (incommingMessage.equals("med")){
+      else if (command.equals("med")){
         if (led_status == 0) {
         digitalWrite(light1, LOW);
         digitalWrite(light2, HIGH);
@@ -201,7 +228,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
 
       }
-      else if (incommingMessage.equals("low")) {
+      else if (command.equals("low")) {
         digitalWrite(light1, LOW);
         digitalWrite(light2, HIGH);
         digitalWrite(light3, LOW);
@@ -267,6 +294,7 @@ void reconnect() {
 //================================================
 void setup() {
   Serial.begin(9600);
+  Serial.println("BoxId= "+String(boxId));
   pinMode(watering, OUTPUT);
   pinMode(light1, OUTPUT);
   pinMode(light2, OUTPUT);
@@ -328,11 +356,12 @@ void loop() {
       Serial.println(rh_value);
 
     tempsensors.requestTemperatures();
-    Serial.println(tempsensors.getTempCByIndex(0));
+    temp_value = tempsensors.getTempCByIndex(0);
+    Serial.println(temp_value);
 
-    publishMessage(light_sensor_topic,String(light_sensor),true);    
-    publishMessage(rh_sensor_topic,String(rh_value)+"%",true);
-    publishMessage(temp_sensor_topic,String(tempsensors.getTempCByIndex(0)),true);
+    publishMessage(light_sensor_topic,String(boxId)+","+String(light_sensor),true);    
+    publishMessage(rh_sensor_topic,String(boxId)+","+String(rh_value)+"%",true);
+    publishMessage(temp_sensor_topic,String(boxId)+","+String(temp_value),true);
     
   }
 }
