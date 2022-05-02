@@ -51,11 +51,11 @@ int rh_value = 0;
 float temp_value = 0;
 
 int defaultCount = 0;
-int led_status = 0;
 
 const char* light_sensor_topic= "sensor/light";
 const char*  rh_sensor_topic="sensor/rh";
 const char* temp_sensor_topic= "sensor/temp";
+const char* status_topic= "sensor/status";
 
 
 const char* command1_topic="sensor/watering";
@@ -128,7 +128,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   if(!recievedId.equals(boxId)){
     Serial.println("BoxId Mismatch");
     return;
-
   }
 
   if (defaultCount == 0) {
@@ -140,7 +139,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     defaultCount = 1;
     return;
   }
-  
   //--- check the incomming message (waterpump)
     if( strcmp(topic,command1_topic) == 0){
       Serial.println("Watering System ");
@@ -185,9 +183,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
       }
   }
   else {
-
   }
-  
+}
+//======================================= publising as strings
+void publishMessage(const char* topic, String payload , boolean retained){
+  client.publish(topic, (byte*) payload.c_str(), 10, true);
+  Serial.println("Message publised ["+String(topic)+"]: "+payload);
 }
 //==========================================
 void setup_wifi() {
@@ -206,8 +207,6 @@ void setup_wifi() {
   Serial.println("\nWiFi connected\nIP address: ");
   Serial.println(WiFi.localIP());
 }
-
-
 //=====================================
 void reconnect() {
   // Loop until we're reconnected
@@ -219,6 +218,8 @@ void reconnect() {
     if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
       digitalWrite(LED,HIGH);
+      client.publish(status_topic, (byte*) (String(boxId)+",connected").c_str(), 14, true);
+      Serial.println("Message publised ["+String(status_topic)+"]: "+(String(boxId)+",connected"));
       client.subscribe(command1_topic);   // subscribe the topics here
       client.subscribe(command2_topic);   // subscribe the topics here
     } else {
@@ -229,7 +230,6 @@ void reconnect() {
     }
   }
 }
-
 //================================================ setup
 //================================================
 void setup() {
@@ -268,14 +268,6 @@ void setup() {
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 }
-
-//======================================= publising as strings
-void publishMessage(const char* topic, String payload , boolean retained){
-  client.publish(topic, (byte*) payload.c_str(), 10, true);
-  Serial.println("Message publised ["+String(topic)+"]: "+payload);
-}
-
-
 //================================================ loop
 //================================================
 void loop() {
@@ -286,14 +278,13 @@ void loop() {
   unsigned long now = millis();
   if (now - lastMsg > 60000) {
     lastMsg = now;
-    
     if (lightMeter.measurementReady()) {
     light_sensor= lightMeter.readLightLevel();   
     }
     rh_sensor = analogRead(SensorPin);
     Serial.println(rh_sensor);
     rh_value = map(rh_sensor, AirValue, WaterValue, 0, 100);
-      Serial.println(rh_value);
+    Serial.println(rh_value);
 
     tempsensors.requestTemperatures();
     temp_value = tempsensors.getTempCByIndex(0);
@@ -301,11 +292,9 @@ void loop() {
 
     publishMessage(light_sensor_topic,String(boxId)+","+String(light_sensor),true);    
     publishMessage(rh_sensor_topic,String(boxId)+","+String(rh_value)+"%",true);
-    publishMessage(temp_sensor_topic,String(boxId)+","+String(temp_value),true);
-    
+    publishMessage(temp_sensor_topic,String(boxId)+","+String(temp_value),true);    
   }
 }
-
 //=======================================  
 
 
