@@ -51,7 +51,6 @@ int rh_value = 0;
 float temp_value = 0;
 
 int defaultCount = 0;
-int powerStatus = 0;
 
 const char* light_sensor_topic= "sensor/light";
 const char*  rh_sensor_topic="sensor/rh";
@@ -221,8 +220,6 @@ void reconnect() {
       digitalWrite(LED,HIGH);
       client.publish(status_topic, (byte*) (String(boxId)+",connected").c_str(), 14, true);
       Serial.println("Message publised ["+String(status_topic)+"]: "+(String(boxId)+",connected"));
-      publishMessage(status_topic, String(powerStatus), true);
-      powerStatus = 2;
       client.subscribe(command1_topic);   // subscribe the topics here
       client.subscribe(command2_topic);   // subscribe the topics here
     } else {
@@ -238,7 +235,6 @@ void reconnect() {
 //================================================
 void setup() {
   Serial.begin(9600);
-  powerStatus = 1;
   Serial.println("BoxId= "+String(boxId));
   pinMode(watering, OUTPUT);
   pinMode(light1, OUTPUT);
